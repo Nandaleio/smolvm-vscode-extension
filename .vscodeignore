@@ -1,0 +1,9 @@
+.vscode/**
+src/**
+node_modules/**
+!node_modules/smolmachines/**
+esbuild.js
+tsconfig.json
+bun.lock
+**/*.map
+**/.gitignore

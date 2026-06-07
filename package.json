@@ -1,0 +1,219 @@
+{
+  "name": "smolvm-manager",
+  "displayName": "SmolVM Manager",
+  "description": "Manage SmolVM instances from within VS Code.",
+  "version": "0.0.1",
+  "publisher": "smolvm",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "smolvm",
+          "title": "SmolVM",
+          "icon": "media/smolvm.svg"
+        }
+      ]
+    },
+    "views": {
+      "smolvm": [
+        {
+          "id": "smolvm.instances",
+          "name": "Instances",
+          "icon": "media/smolvm.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "smolvm.instances",
+        "contents": "No SmolVM instances yet.\n[Create Instance](command:smolvm.createInstance)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "smolvm.refresh",
+        "title": "Refresh",
+        "category": "SmolVM",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "smolvm.createInstance",
+        "title": "Create Instance",
+        "category": "SmolVM",
+        "icon": "$(add)"
+      },
+      {
+        "command": "smolvm.startInstance",
+        "title": "Start",
+        "category": "SmolVM",
+        "icon": "$(play)"
+      },
+      {
+        "command": "smolvm.stopInstance",
+        "title": "Stop",
+        "category": "SmolVM",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "smolvm.openShell",
+        "title": "Open Shell",
+        "category": "SmolVM",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "smolvm.deleteInstance",
+        "title": "Delete",
+        "category": "SmolVM",
+        "icon": "$(trash)"
+      }
+    ],
+    "configuration": {
+      "title": "SmolVM",
+      "properties": {
+        "smolvm.cliPath": {
+          "type": "string",
+          "default": "smolvm",
+          "markdownDescription": "Path to the `smolvm` CLI used by **Open Shell**, which runs `smolvm machine exec --name <name> -it -- <shell>` in a terminal."
+        },
+        "smolvm.shell": {
+          "type": "string",
+          "default": "/bin/sh",
+          "markdownDescription": "Shell binary inside the machine to launch with **Open Shell** (the `-- <shell>` passed to `smolvm machine exec`)."
+        },
+        "smolvm.image": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Default base OCI image for new machines (e.g. `python:3.12`). Leave blank for none. Can be overridden when creating a machine."
+        },
+        "smolvm.mountSource": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Absolute host folder path to bind into new machines. Leave blank to use the workspace root. Can be overridden (folder picker) when creating a machine."
+        },
+        "smolvm.workspaceMount": {
+          "type": "string",
+          "default": "/workspace",
+          "markdownDescription": "In-VM path to bind-mount the chosen folder into new machines (read-write). Leave blank to disable."
+        },
+        "smolvm.persistent": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Keep machines after the process exits so they can be reconnected. **Required** for Start/Open Shell to work after a reload — disabling it will break those."
+        },
+        "smolvm.ports": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Host→guest port mappings for new machines.",
+          "items": {
+            "type": "object",
+            "required": ["host", "guest"],
+            "properties": {
+              "host": { "type": "number", "description": "Host port." },
+              "guest": { "type": "number", "description": "Guest port." }
+            }
+          }
+        },
+        "smolvm.autoStopSeconds": {
+          "type": ["number", "null"],
+          "default": null,
+          "minimum": 1,
+          "markdownDescription": "Auto-stop a machine after N idle seconds (cloud). Leave unset to disable."
+        },
+        "smolvm.ttlSeconds": {
+          "type": ["number", "null"],
+          "default": null,
+          "minimum": 1,
+          "markdownDescription": "Delete a machine after N seconds (cloud). Leave unset to disable."
+        },
+        "smolvm.resources.cpus": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "markdownDescription": "Number of vCPUs allocated to new machines."
+        },
+        "smolvm.resources.memoryMb": {
+          "type": "number",
+          "default": 1024,
+          "minimum": 128,
+          "markdownDescription": "Memory (MB) allocated to new machines."
+        },
+        "smolvm.resources.network": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Enable outbound network access (TSI) for new machines."
+        },
+        "smolvm.resources.storageGb": {
+          "type": ["number", "null"],
+          "default": null,
+          "minimum": 1,
+          "markdownDescription": "Storage disk size (GB) for new machines. Leave unset for the SDK default (20)."
+        },
+        "smolvm.resources.overlayGb": {
+          "type": ["number", "null"],
+          "default": null,
+          "minimum": 1,
+          "markdownDescription": "Overlay disk size (GB) for new machines. Leave unset for the SDK default (10)."
+        }
+      }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "smolvm.createInstance",
+          "when": "view == smolvm.instances",
+          "group": "navigation@1"
+        },
+        {
+          "command": "smolvm.refresh",
+          "when": "view == smolvm.instances",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "smolvm.startInstance",
+          "when": "view == smolvm.instances && viewItem == instance-stopped",
+          "group": "inline@1"
+        },
+        {
+          "command": "smolvm.stopInstance",
+          "when": "view == smolvm.instances && viewItem == instance-running",
+          "group": "inline@1"
+        },
+        {
+          "command": "smolvm.openShell",
+          "when": "view == smolvm.instances && viewItem == instance-running",
+          "group": "inline@2"
+        },
+        {
+          "command": "smolvm.deleteInstance",
+          "when": "view == smolvm.instances && viewItem =~ /^instance-/",
+          "group": "inline@3"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "bun run esbuild.js",
+    "watch": "bun run esbuild.js --watch",
+    "vscode:prepublish": "bun run esbuild.js --production",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.21.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "smolmachines": "^0.1.5"
+  }
+}
