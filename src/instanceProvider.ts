@@ -1,11 +1,6 @@
 import * as vscode from "vscode";
-import type { MountSpec, ResourceSpec } from "smolmachines";
-import type {
-  CreateOverrides,
-  InstanceInfo,
-  InstanceStatus,
-  MachineManager,
-} from "./machineManager";
+import type { MachineConfig, MachineState, MountSpec, ResourceSpec } from "smolmachines";
+import type { InstanceInfo, MachineManager } from "./machineManager";
 
 /**
  * Backs the SmolVM "Instances" tree view. All machine operations are delegated
@@ -82,12 +77,12 @@ export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
    * default (press Enter to accept it); blanking a field falls back to the
    * default, and pressing Escape returns `undefined` to cancel.
    */
-  private async promptCreateOptions(): Promise<CreateOverrides | undefined> {
+  private async promptCreateOptions(): Promise<MachineConfig | undefined> {
     const cfg = vscode.workspace.getConfiguration("smolvm");
 
     const imageValue = await vscode.window.showInputBox({
       title: "Image (optional)",
-      prompt: "Base OCI image, e.g. python:3.12 — blank for none",
+      prompt: "Base OCI image, e.g. python:3.12 — blank for bar Alpine",
       value: cfg.get<string>("image", ""),
     });
     if (imageValue === undefined) {
@@ -118,6 +113,31 @@ export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
       cfg.get<number | null>("resources.storageGb", null) ?? undefined,
     );
     if (storageGb === null) {
+      return undefined;
+    }
+
+    // Outbound network access (TSI); default-first so Enter accepts the setting.
+    const networkDefault = cfg.get<boolean>("resources.network", true);
+    const enabled = {
+      label: "$(globe) Enabled",
+      description: "Outbound network access (TSI)",
+      value: true,
+    };
+    const disabled = {
+      label: "$(circle-slash) Disabled",
+      description: "No outbound network access",
+      value: false,
+    };
+    const networkPick = await vscode.window.showQuickPick(
+      networkDefault ? [enabled, disabled] : [disabled, enabled],
+      {
+        title: "Network",
+        placeHolder: `Outbound network access — default: ${
+          networkDefault ? "enabled" : "disabled"
+        }`,
+      },
+    );
+    if (networkPick === undefined) {
       return undefined;
     }
 
@@ -182,7 +202,7 @@ export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
       }
     }
 
-    const resources: ResourceSpec = {};
+    const resources: ResourceSpec = { network: networkPick.value };
     if (cpus.value !== undefined) {
       resources.cpus = cpus.value;
     }
@@ -193,7 +213,7 @@ export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
       resources.storageGb = storageGb.value;
     }
 
-    const overrides: CreateOverrides = { resources, mounts };
+    const overrides: MachineConfig = { resources, mounts };
     const image = imageValue.trim();
     if (image) {
       overrides.image = image;
@@ -340,7 +360,7 @@ export class InstanceItem extends vscode.TreeItem {
   }
 }
 
-function iconFor(status: InstanceStatus): string {
+function iconFor(status: MachineState): string {
   return status === "running" ? "vm-running" : "vm-outline";
 }
 

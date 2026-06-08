@@ -3,7 +3,10 @@
   "displayName": "SmolVM Manager",
   "description": "Manage SmolVM instances from within VS Code.",
   "version": "0.0.1",
-  "publisher": "smolvm",
+  "publisher": "Nandaleio",
+  "repository": {
+    "url": "https://github.com/Nandaleio/smolvm-vscode-extension.git"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },

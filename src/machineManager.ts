@@ -5,20 +5,17 @@ import type {
   MountSpec,
   PortSpec,
   ResourceSpec,
+  MachineState,
 } from "smolmachines";
 
 /** The `Machine` class itself (injected so the SDK is the single source of truth). */
 export type MachineClass = typeof Machine;
 
-export type InstanceStatus = "running" | "stopped";
-
+/** The vm instance class used for listing VMs  */
 export interface InstanceInfo {
   name: string;
-  status: InstanceStatus;
+  status: MachineState;
 }
-
-/** Per-creation overrides: a partial of the SDK's own {@link MachineConfig}. */
-export type CreateOverrides = Partial<MachineConfig>;
 
 const STORAGE_KEY = "smolvm.machines";
 
@@ -48,7 +45,7 @@ export class MachineManager {
   }
 
   /** Create and start a new persistent machine. */
-  async create(name: string, overrides: CreateOverrides = {}): Promise<void> {
+  async create(name: string, overrides: MachineConfig = {}): Promise<void> {
     if (this.has(name)) {
       throw new Error(`A machine named "${name}" already exists.`);
     }
@@ -63,7 +60,7 @@ export class MachineManager {
    * `MachineConfig` attribute is exposed via settings; optional ones are only
    * included when set.
    */
-  private buildConfig(name: string, overrides: CreateOverrides): MachineConfig {
+  private buildConfig(name: string, overrides: MachineConfig): MachineConfig {
     const cfg = vscode.workspace.getConfiguration("smolvm");
     const res = overrides.resources ?? {};
 
@@ -71,6 +68,7 @@ export class MachineManager {
       cpus: res.cpus ?? cfg.get<number>("resources.cpus", 2),
       memoryMb: res.memoryMb ?? cfg.get<number>("resources.memoryMb", 1024),
       network: res.network ?? cfg.get<boolean>("resources.network", true),
+
     };
     const storageGb =
       res.storageGb ?? cfg.get<number | null>("resources.storageGb", null);
@@ -161,7 +159,7 @@ export class MachineManager {
     return machine;
   }
 
-  private async setStatus(name: string, status: InstanceStatus): Promise<void> {
+  private async setStatus(name: string, status: MachineState): Promise<void> {
     const infos = this.list();
     const target = infos.find((i) => i.name === name);
     if (target) {
