@@ -13,6 +13,7 @@
   "categories": [
     "Other"
   ],
+  "icon": "media/icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [],
   "contributes": {
@@ -84,7 +85,13 @@
         "smolvm.cliPath": {
           "type": "string",
           "default": "smolvm",
-          "markdownDescription": "Path to the `smolvm` CLI used by **Open Shell**, which runs `smolvm machine exec --name <name> -it -- <shell>` in a terminal."
+          "markdownDescription": "Path to the `smolvm` CLI. Used to list machines (`machine ls --json`) and to open shells (`machine exec --name <name> -it -- <shell>`)."
+        },
+        "smolvm.refreshIntervalSeconds": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "markdownDescription": "How often (seconds) to refresh the machine list by running `smolvm machine ls`. Set to `0` to disable periodic polling (the list still refreshes at startup and after actions)."
         },
         "smolvm.shell": {
           "type": "string",

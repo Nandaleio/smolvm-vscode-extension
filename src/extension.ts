@@ -4,7 +4,7 @@ import { InstanceProvider } from "./instanceProvider";
 import { MachineManager } from "./machineManager";
 
 export function activate(context: vscode.ExtensionContext): void {
-  const manager = new MachineManager(context, Machine);
+  const manager = new MachineManager(Machine);
   const provider = new InstanceProvider(context, manager);
 
   const treeView = vscode.window.createTreeView("smolvm.instances", {
@@ -14,7 +14,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     treeView,
-    vscode.commands.registerCommand("smolvm.refresh", () => provider.refresh()),
+    vscode.commands.registerCommand("smolvm.refresh", () => provider.reload(true)),
     vscode.commands.registerCommand("smolvm.createInstance", () =>
       provider.createInstance(),
     ),
@@ -31,6 +31,19 @@ export function activate(context: vscode.ExtensionContext): void {
       provider.deleteInstance(item),
     ),
   );
+
+  // Populate the list from `smolvm machine ls` now, then poll periodically.
+  void provider.reload();
+  const intervalSeconds = vscode.workspace
+    .getConfiguration("smolvm")
+    .get<number>("refreshIntervalSeconds", 10);
+  if (intervalSeconds > 0) {
+    const timer = setInterval(
+      () => void provider.reload(),
+      intervalSeconds * 1000,
+    );
+    context.subscriptions.push({ dispose: () => clearInterval(timer) });
+  }
 }
 
 export function deactivate(): void {

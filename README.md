@@ -1,12 +1,20 @@
 # SmolVM Manager
 
-A VS Code extension to manage [SmolVM](https://www.npmjs.com/package/smolmachines)
+<p align="center">
+  <img src="media/smolmachines.svg" alt="smol machines" width="240">
+</p>
+
+
+
+A VS Code extension to manage [SmolVM](https://smolmachines.com/)
 microVM sandboxes from within the editor, powered by the
-[`smolmachines`](https://www.npmjs.com/package/smolmachines) Node SDK.
+[`smolvm-sdk Node JS SDK`](https://github.com/smol-machines/smolvm-sdk).
 
 ## Features
 
-- **SmolVM** activity-bar view listing your machines and their status.
+- **SmolVM** activity-bar view listing your machines and their status. The list
+  is populated from `smolvm machine ls --json` at startup and refreshed
+  periodically (and after each action).
 - Create, start, stop, and delete machines from the view title bar and inline
   actions — all backed by the `smolmachines` SDK.
 - **Open Shell**: drop into a running machine in a dedicated VS Code terminal.
@@ -54,7 +62,8 @@ are omitted so the SDK applies its own defaults.
 
 | Setting                       | Default      | Purpose                                  |
 | ----------------------------- | ------------ | ---------------------------------------- |
-| `smolvm.cliPath`              | `smolvm`     | `smolvm` CLI binary used by Open Shell.   |
+| `smolvm.cliPath`              | `smolvm`     | `smolvm` CLI binary (list + Open Shell).   |
+| `smolvm.refreshIntervalSeconds` | `10`       | Polling interval for `machine ls` (`0` = off). |
 | `smolvm.shell`                | `/bin/sh`    | In-VM shell launched by Open Shell.      |
 | `smolvm.image`                | `""`         | Default base OCI image for new machines (blank = bare Alpine).  |
 | `smolvm.mountSource`          | `""`         | Host folder to bind (blank = workspace root). |

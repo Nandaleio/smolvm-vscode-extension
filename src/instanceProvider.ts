@@ -30,8 +30,23 @@ export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
     );
   }
 
+  /** Re-render the tree from the manager's cached snapshot. */
   refresh(): void {
     this._onDidChangeTreeData.fire();
+  }
+
+  /** Re-query `smolvm machine ls` then re-render. */
+  async reload(surfaceErrors = false): Promise<void> {
+    try {
+      await this.manager.refresh();
+    } catch (err) {
+      if (surfaceErrors) {
+        this.reportError(err);
+      } else {
+        console.error("SmolVM: failed to list machines", err);
+      }
+    }
+    this.refresh();
   }
 
   getTreeItem(element: InstanceItem): vscode.TreeItem {

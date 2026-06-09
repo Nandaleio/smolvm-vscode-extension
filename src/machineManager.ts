@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import type {
   Machine,
   MachineConfig,
@@ -7,6 +9,8 @@ import type {
   ResourceSpec,
   MachineState,
 } from "smolmachines";
+
+const execFileAsync = promisify(execFile);
 
 /** The `Machine` class itself (injected so the SDK is the single source of truth). */
 export type MachineClass = typeof Machine;
@@ -17,31 +21,41 @@ export interface InstanceInfo {
   status: MachineState;
 }
 
-const STORAGE_KEY = "smolvm.machines";
-
 /**
  * Owns the set of SmolVM machines for the workspace.
  *
- * The SDK has no "list machines" call, so the registry of names (and last-known
- * status) lives in workspace state. Live {@link Machine} handles are cached in
- * memory; after a reload we re-attach by name with `Machine.connect`, which
- * boots a persisted-but-stopped machine. Machines are created `persistent` so
- * they can be reconnected at all.
+ * The list is sourced from the `smolvm` CLI (`machine ls --json`), refreshed at
+ * startup and periodically; the latest snapshot is cached in memory and exposed
+ * via {@link list}. Lifecycle actions go through the embedded SDK; live
+ * {@link Machine} handles are cached so we can stop/delete without reconnecting.
  */
 export class MachineManager {
   private readonly live = new Map<string, Machine>();
+  private snapshot: InstanceInfo[] = [];
 
-  constructor(
-    private readonly context: vscode.ExtensionContext,
-    private readonly Machine: MachineClass,
-  ) {}
+  constructor(private readonly Machine: MachineClass) {}
 
+  /** The latest cached snapshot from the CLI. */
   list(): InstanceInfo[] {
-    return this.context.workspaceState.get<InstanceInfo[]>(STORAGE_KEY, []);
+    return this.snapshot;
   }
 
   has(name: string): boolean {
-    return this.list().some((i) => i.name === name);
+    return this.snapshot.some((i) => i.name === name);
+  }
+
+  /** Re-query `smolvm machine ls --json` and update the cached snapshot. */
+  async refresh(): Promise<InstanceInfo[]> {
+    const cli = vscode.workspace
+      .getConfiguration("smolvm")
+      .get<string>("cliPath", "smolvm");
+    const { stdout } = await execFileAsync(
+      cli,
+      ["machine", "ls", "--json"],
+      { timeout: 15_000 },
+    );
+    this.snapshot = parseMachines(stdout);
+    return this.snapshot;
   }
 
   /** Create and start a new persistent machine. */
@@ -51,7 +65,7 @@ export class MachineManager {
     }
     const machine = await this.Machine.create(this.buildConfig(name, overrides));
     this.live.set(name, machine);
-    await this.upsert({ name, status: "running" });
+    await this.refresh();
   }
 
   /**
@@ -133,20 +147,20 @@ export class MachineManager {
     this.live.delete(name);
     const machine = await this.Machine.connect(name);
     this.live.set(name, machine);
-    await this.setStatus(name, "running");
+    await this.refresh();
   }
 
   async stop(name: string): Promise<void> {
     const machine = await this.handle(name);
     await machine.stop();
-    await this.setStatus(name, "stopped");
+    await this.refresh();
   }
 
   async delete(name: string): Promise<void> {
     const machine = await this.handle(name);
     await machine.delete();
     this.live.delete(name);
-    await this.persist(this.list().filter((i) => i.name !== name));
+    await this.refresh();
   }
 
   /** A live handle, reconnecting by name if we don't have one cached. */
@@ -158,23 +172,38 @@ export class MachineManager {
     }
     return machine;
   }
+}
 
-  private async setStatus(name: string, status: MachineState): Promise<void> {
-    const infos = this.list();
-    const target = infos.find((i) => i.name === name);
-    if (target) {
-      target.status = status;
-      await this.persist(infos);
+/** Parse the JSON array printed by `smolvm machine ls --json`. */
+function parseMachines(stdout: string): InstanceInfo[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(stdout);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  const machines: InstanceInfo[] = [];
+  for (const entry of data) {
+    if (!entry || typeof entry !== "object") {
+      continue;
     }
+    const record = entry as Record<string, unknown>;
+    const name = record.name;
+    if (typeof name !== "string" || name.length === 0) {
+      continue;
+    }
+    machines.push({ name, status: normalizeStatus(record.state ?? record.status) });
   }
+  return machines;
+}
 
-  private async upsert(info: InstanceInfo): Promise<void> {
-    const infos = this.list().filter((i) => i.name !== info.name);
-    infos.push(info);
-    await this.persist(infos);
+function normalizeStatus(value: unknown): MachineState {
+  const normalized = typeof value === "string" ? value.toLowerCase() : "";
+  if (normalized === "running" || normalized === "stopped" || normalized === "created") {
+    return normalized;
   }
-
-  private async persist(infos: InstanceInfo[]): Promise<void> {
-    await this.context.workspaceState.update(STORAGE_KEY, infos);
-  }
+  return "stopped";
 }
