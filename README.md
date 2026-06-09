@@ -1,7 +1,7 @@
 # SmolVM Manager
 
 <p align="center">
-  <img src="media/smolmachines.svg" alt="smol machines" width="240">
+  <img src="media/smolmachines.png" alt="smol machines" width="240">
 </p>
 
 
