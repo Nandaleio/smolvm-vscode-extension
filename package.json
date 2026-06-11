@@ -73,6 +73,12 @@
         "icon": "$(terminal)"
       },
       {
+        "command": "smolvm.execCommand",
+        "title": "Run Command",
+        "category": "SmolVM",
+        "icon": "$(run)"
+      },
+      {
         "command": "smolvm.deleteInstance",
         "title": "Delete",
         "category": "SmolVM",
@@ -204,9 +210,14 @@
           "group": "inline@2"
         },
         {
+          "command": "smolvm.execCommand",
+          "when": "view == smolvm.instances && viewItem == instance-running",
+          "group": "inline@3"
+        },
+        {
           "command": "smolvm.deleteInstance",
           "when": "view == smolvm.instances && viewItem =~ /^instance-/",
-          "group": "inline@3"
+          "group": "inline@4"
         }
       ]
     }

@@ -27,6 +27,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("smolvm.openShell", (item) =>
       provider.openShell(item),
     ),
+    vscode.commands.registerCommand("smolvm.execCommand", (item) =>
+      provider.execCommand(item),
+    ),
     vscode.commands.registerCommand("smolvm.deleteInstance", (item) =>
       provider.deleteInstance(item),
     ),

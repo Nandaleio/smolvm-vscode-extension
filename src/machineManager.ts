@@ -8,6 +8,8 @@ import type {
   PortSpec,
   ResourceSpec,
   MachineState,
+  ExecEvent,
+  ExecOptions,
 } from "smolmachines";
 
 const execFileAsync = promisify(execFile);
@@ -148,6 +150,23 @@ export class MachineManager {
     const machine = await this.Machine.connect(name);
     this.live.set(name, machine);
     await this.refresh();
+  }
+
+  /**
+   * Execute a command in a machine and stream stdout/stderr/exit events as they
+   * arrive. The machine is reconnected by name if no live handle is cached.
+   */
+  execStream(
+    name: string,
+    command: string[],
+    opts?: ExecOptions,
+  ): AsyncGenerator<ExecEvent> {
+    const handlePromise = this.handle(name);
+    async function* stream(): AsyncGenerator<ExecEvent> {
+      const machine = await handlePromise;
+      yield* machine.execStream(command, opts);
+    }
+    return stream();
   }
 
   async stop(name: string): Promise<void> {

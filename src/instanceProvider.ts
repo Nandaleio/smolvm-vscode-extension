@@ -15,6 +15,9 @@ export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
   /** Live shell terminals keyed by machine name, so we can reuse them. */
   private readonly terminals = new Map<string, vscode.Terminal>();
 
+  /** Output channels for streamed `exec` output, keyed by machine name. */
+  private readonly outputChannels = new Map<string, vscode.OutputChannel>();
+
   constructor(
     context: vscode.ExtensionContext,
     private readonly manager: MachineManager,
@@ -27,6 +30,7 @@ export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
           }
         }
       }),
+      { dispose: () => this.outputChannels.forEach((c) => c.dispose()) },
     );
   }
 
@@ -332,11 +336,97 @@ export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
     this.refresh();
   }
 
+  /**
+   * Prompt for a command, run it in the machine via the SDK's streaming exec,
+   * and pipe stdout/stderr line-by-line into a dedicated output channel.
+   * Surfaced as a cancellable progress notification — cancelling stops the
+   * stream (mirroring the SDK sample's `AbortController`).
+   */
+  async execCommand(item: InstanceItem): Promise<void> {
+    const name = item.instance.name;
+
+    const command = await vscode.window.showInputBox({
+      title: `Run command in "${name}"`,
+      prompt: "Command to execute (run via the machine's shell)",
+      placeHolder: "echo hello && uname -a",
+      validateInput: (value) =>
+        value.trim().length === 0 ? "Command cannot be empty" : undefined,
+    });
+    if (!command || command.trim().length === 0) {
+      return;
+    }
+
+    // A command needs a running machine; boot it via the SDK first if needed.
+    if (item.instance.status !== "running") {
+      await this.withProgress(`Starting "${name}"`, () =>
+        this.manager.start(name),
+      );
+    }
+
+    const channel = this.outputChannelFor(name);
+    channel.show(true);
+    channel.appendLine(`$ ${command.trim()}`);
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Running command in "${name}"`,
+        cancellable: true,
+      },
+      async (_progress, token) => {
+        const stream = this.manager.execStream(name, [
+          "sh",
+          "-c",
+          command.trim(),
+        ]);
+        const cancel = token.onCancellationRequested(() => void stream.return?.(undefined));
+        try {
+          for await (const event of stream) {
+            if (event.kind === "stdout" || event.kind === "stderr") {
+              channel.append(event.data);
+            } else if (event.kind === "exit") {
+              channel.appendLine(`\n[exited with code ${event.exitCode}]`);
+            } else if (event.kind === "error") {
+              channel.appendLine(`\n[error] ${event.message}`);
+            }
+          }
+        } catch (err) {
+          if (!token.isCancellationRequested) {
+            channel.appendLine(
+              `\n[error] ${err instanceof Error ? err.message : String(err)}`,
+            );
+            this.reportError(err);
+          }
+        } finally {
+          cancel.dispose();
+          if (token.isCancellationRequested) {
+            channel.appendLine("\n[cancelled]");
+          }
+        }
+      },
+    );
+  }
+
+  /** Get (or lazily create) the output channel for a machine's exec output. */
+  private outputChannelFor(name: string): vscode.OutputChannel {
+    let channel = this.outputChannels.get(name);
+    if (!channel) {
+      channel = vscode.window.createOutputChannel(`SmolVM: ${name}`);
+      this.outputChannels.set(name, channel);
+    }
+    return channel;
+  }
+
   private disposeTerminal(name: string): void {
     const terminal = this.terminals.get(name);
     if (terminal) {
       this.terminals.delete(name);
       terminal.dispose();
+    }
+    const channel = this.outputChannels.get(name);
+    if (channel) {
+      this.outputChannels.delete(name);
+      channel.dispose();
     }
   }
 
