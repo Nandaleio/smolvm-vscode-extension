@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext): void {
   void provider.reload();
   const intervalSeconds = vscode.workspace
     .getConfiguration("smolvm")
-    .get<number>("refreshIntervalSeconds", 10);
+    .get<number>("refreshIntervalSeconds", 60);
   if (intervalSeconds > 0) {
     const timer = setInterval(
       () => void provider.reload(),

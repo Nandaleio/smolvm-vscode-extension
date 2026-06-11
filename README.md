@@ -1,4 +1,4 @@
-# SmolVM Manager
+# SmolVM VSCode
 
 <p align="center">
   <img src="media/smolmachines.png" alt="smol machines" width="240">
@@ -63,7 +63,7 @@ are omitted so the SDK applies its own defaults.
 | Setting                       | Default      | Purpose                                  |
 | ----------------------------- | ------------ | ---------------------------------------- |
 | `smolvm.cliPath`              | `smolvm`     | `smolvm` CLI binary (list + Open Shell).   |
-| `smolvm.refreshIntervalSeconds` | `10`       | Polling interval for `machine ls` (`0` = off). |
+| `smolvm.refreshIntervalSeconds` | `60`       | Polling interval for `machine ls` (`0` = off). |
 | `smolvm.shell`                | `/bin/sh`    | In-VM shell launched by Open Shell.      |
 | `smolvm.image`                | `""`         | Default base OCI image for new machines (blank = bare Alpine).  |
 | `smolvm.mountSource`          | `""`         | Host folder to bind (blank = workspace root). |

@@ -1,8 +1,8 @@
 {
-  "name": "smolvm-manager",
-  "displayName": "SmolVM Manager",
+  "name": "smolvm-vscode",
+  "displayName": "SmolVM-VSCode",
   "description": "Manage SmolVM instances from within VS Code.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "Nandaleio",
   "repository": {
     "url": "https://github.com/Nandaleio/smolvm-vscode-extension.git"
@@ -89,7 +89,7 @@
         },
         "smolvm.refreshIntervalSeconds": {
           "type": "number",
-          "default": 10,
+          "default": 60,
           "minimum": 0,
           "markdownDescription": "How often (seconds) to refresh the machine list by running `smolvm machine ls`. Set to `0` to disable periodic polling (the list still refreshes at startup and after actions)."
         },
