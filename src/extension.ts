@@ -39,16 +39,22 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   // Populate the list from `smolvm machine ls` now, then poll periodically.
+  // Only spawn the CLI while the view is actually visible; refresh on reveal so
+  // a hidden-then-shown panel is immediately current.
   void provider.reload();
   const intervalSeconds = vscode.workspace
     .getConfiguration("smolvm")
     .get<number>("refreshIntervalSeconds", 60);
   if (intervalSeconds > 0) {
-    const timer = setInterval(
-      () => void provider.reload(),
-      intervalSeconds * 1000,
+    const timer = setInterval(() => {
+      if (treeView.visible) void provider.reload();
+    }, intervalSeconds * 1000);
+    context.subscriptions.push(
+      { dispose: () => clearInterval(timer) },
+      treeView.onDidChangeVisibility((e) => {
+        if (e.visible) void provider.reload();
+      }),
     );
-    context.subscriptions.push({ dispose: () => clearInterval(timer) });
   }
 }
 
