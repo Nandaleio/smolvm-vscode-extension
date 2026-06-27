@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type {
@@ -73,6 +74,8 @@ export class MachineManager {
   /**
    * Create a machine from a Smolfile via the `smolvm` CLI (the SDK has no
    * Smolfile support): `machine create --name <name> --smolfile <smolfile>`.
+   * The CLI is run from the Smolfile's own directory, passing just its filename,
+   * so any relative paths the Smolfile references resolve against that folder.
    */
   async createFromSmolfile(name: string, smolfilePath: string): Promise<void> {
     if (this.has(name)) {
@@ -81,10 +84,11 @@ export class MachineManager {
     const cli = vscode.workspace
       .getConfiguration("smolvm")
       .get<string>("cliPath", "smolvm");
+
     await execFileAsync(
       cli,
-      ["machine", "create", "--name", name, "--smolfile", smolfilePath],
-      { timeout: 300_000 },
+      ["machine", "create", "--name", name, "--smolfile", path.basename(smolfilePath)],
+      { timeout: 300_000, cwd: path.dirname(smolfilePath) },
     );
     await this.refresh();
   }
