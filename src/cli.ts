@@ -14,8 +14,12 @@ function cliPath(): string {
 }
 
 /** Run a `smolvm` subcommand to completion and return its stdout. */
-export async function run(args: string[], timeoutMs = 60_000): Promise<string> {
-  const { stdout } = await execFileAsync(cliPath(), args, { timeout: timeoutMs });
+export async function run(
+  args: string[],
+  timeoutMs = 60_000,
+  cwd?: string,
+): Promise<string> {
+  const { stdout } = await execFileAsync(cliPath(), args, { timeout: timeoutMs, cwd });
   return stdout;
 }
 

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import { run, stream } from "./cli";
 import type {
   ExecEvent,
@@ -48,14 +49,17 @@ export class MachineManager {
   /**
    * Create a machine from a Smolfile:
    * `machine create --name <name> --smolfile <smolfile>`.
+   * The CLI is run from the Smolfile's own directory, passing just its filename,
+   * so any relative paths the Smolfile references resolve against that folder.
    */
   async createFromSmolfile(name: string, smolfilePath: string): Promise<void> {
     if (this.has(name)) {
       throw new Error(`A machine named "${name}" already exists.`);
     }
     await run(
-      ["machine", "create", "--name", name, "--smolfile", smolfilePath],
+      ["machine", "create", "--name", name, "--smolfile", path.basename(smolfilePath)],
       300_000,
+      path.dirname(smolfilePath),
     );
     await this.refresh();
   }
