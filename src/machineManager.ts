@@ -71,6 +71,25 @@ export class MachineManager {
   }
 
   /**
+   * Create a machine from a Smolfile via the `smolvm` CLI (the SDK has no
+   * Smolfile support): `machine create --name <name> --smolfile <smolfile>`.
+   */
+  async createFromSmolfile(name: string, smolfilePath: string): Promise<void> {
+    if (this.has(name)) {
+      throw new Error(`A machine named "${name}" already exists.`);
+    }
+    const cli = vscode.workspace
+      .getConfiguration("smolvm")
+      .get<string>("cliPath", "smolvm");
+    await execFileAsync(
+      cli,
+      ["machine", "create", "--name", name, "--smolfile", smolfilePath],
+      { timeout: 300_000 },
+    );
+    await this.refresh();
+  }
+
+  /**
    * Build the SDK {@link MachineConfig}, layering `overrides` (itself a
    * `Partial<MachineConfig>`) over the configured `smolvm.*` defaults. Every
    * `MachineConfig` attribute is exposed via settings; optional ones are only

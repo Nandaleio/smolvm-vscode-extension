@@ -2,7 +2,7 @@
   "name": "smolvm-vscode",
   "displayName": "SmolVM-VSCode",
   "description": "Manage SmolVM instances from within VS Code.",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "publisher": "Nandaleio",
   "repository": {
     "url": "https://github.com/Nandaleio/smolvm-vscode-extension.git"
@@ -38,7 +38,7 @@
     "viewsWelcome": [
       {
         "view": "smolvm.instances",
-        "contents": "No SmolVM instances yet.\n[Create Instance](command:smolvm.createInstance)"
+        "contents": "No SmolVM instances yet.\n[Create Instance](command:smolvm.createInstance)\n[Create from Smolfile](command:smolvm.createFromSmolfile)"
       }
     ],
     "commands": [
@@ -53,6 +53,12 @@
         "title": "Create Instance",
         "category": "SmolVM",
         "icon": "$(add)"
+      },
+      {
+        "command": "smolvm.createFromSmolfile",
+        "title": "Create Instance from Smolfile",
+        "category": "SmolVM",
+        "icon": "$(file-code)"
       },
       {
         "command": "smolvm.startInstance",
@@ -188,15 +194,20 @@
           "group": "navigation@1"
         },
         {
-          "command": "smolvm.refresh",
+          "command": "smolvm.createFromSmolfile",
           "when": "view == smolvm.instances",
           "group": "navigation@2"
+        },
+        {
+          "command": "smolvm.refresh",
+          "when": "view == smolvm.instances",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
         {
           "command": "smolvm.startInstance",
-          "when": "view == smolvm.instances && viewItem == instance-stopped",
+          "when": "view == smolvm.instances && (viewItem == instance-stopped || viewItem == instance-created)",
           "group": "inline@1"
         },
         {

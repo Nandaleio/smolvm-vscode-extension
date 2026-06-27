@@ -62,6 +62,44 @@ export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
   }
 
   async createInstance(): Promise<void> {
+    const trimmedName = await this.promptMachineName();
+    if (!trimmedName) {
+      return;
+    }
+
+    const options = await this.promptCreateOptions();
+    if (options === undefined) {
+      return; // cancelled mid-flow
+    }
+
+    await this.withProgress(`Creating "${trimmedName}"`, () =>
+      this.manager.create(trimmedName, options),
+    );
+  }
+
+  /**
+   * Create a machine from an existing Smolfile via the CLI (mirrors
+   * `smolvm machine create --name <name> --smolfile <smolfile>`). Offers any Smolfiles
+   * found in the workspace plus a file picker.
+   */
+  async createFromSmolfile(): Promise<void> {
+    const smolfile = await this.pickSmolfile();
+    if (!smolfile) {
+      return;
+    }
+
+    const trimmedName = await this.promptMachineName();
+    if (!trimmedName) {
+      return;
+    }
+
+    await this.withProgress(`Creating "${trimmedName}" from Smolfile`, () =>
+      this.manager.createFromSmolfile(trimmedName, smolfile),
+    );
+  }
+
+  /** Prompt for a new (unique, non-empty) machine name; trimmed, or undefined. */
+  private async promptMachineName(): Promise<string | undefined> {
     const name = await vscode.window.showInputBox({
       prompt: "Name for the new SmolVM machine",
       placeHolder: "my-vm",
@@ -76,19 +114,48 @@ export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
         return undefined;
       },
     });
-    if (!name) {
-      return;
-    }
-    const trimmedName = name.trim();
+    return name?.trim() || undefined;
+  }
 
-    const options = await this.promptCreateOptions();
-    if (options === undefined) {
-      return; // cancelled mid-flow
-    }
-
-    await this.withProgress(`Creating "${trimmedName}"`, () =>
-      this.manager.create(trimmedName, options),
+  /** Pick a Smolfile: any found in the workspace, or a chosen file. */
+  private async pickSmolfile(): Promise<string | undefined> {
+    const found = await vscode.workspace.findFiles(
+      "**/Smolfile",
+      "**/node_modules/**",
+      20,
     );
+
+    type Pick = vscode.QuickPickItem & { value: string };
+    const picks: Pick[] = found.map((uri) => ({
+      label: `$(file) ${vscode.workspace.asRelativePath(uri)}`,
+      description: uri.fsPath,
+      value: uri.fsPath,
+    }));
+    picks.push({ label: "$(folder-opened) Choose file…", value: "__choose" });
+
+    const pick = await vscode.window.showQuickPick(picks, {
+      title: "Create from Smolfile",
+      placeHolder: "Pick a Smolfile to create the machine from",
+    });
+    if (!pick) {
+      return undefined;
+    }
+    if (pick.value !== "__choose") {
+      return pick.value;
+    }
+
+    const chosen = await vscode.window.showOpenDialog({
+      canSelectFolders: false,
+      canSelectFiles: true,
+      canSelectMany: false,
+      defaultUri: vscode.workspace.workspaceFolders?.[0]?.uri,
+      openLabel: "Use Smolfile",
+      title: "Select a Smolfile",
+    });
+    if (!chosen || chosen.length === 0) {
+      return undefined;
+    }
+    return chosen[0].fsPath;
   }
 
   /**

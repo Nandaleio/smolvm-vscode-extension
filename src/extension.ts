@@ -18,6 +18,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("smolvm.createInstance", () =>
       provider.createInstance(),
     ),
+    vscode.commands.registerCommand("smolvm.createFromSmolfile", () =>
+      provider.createFromSmolfile(),
+    ),
     vscode.commands.registerCommand("smolvm.startInstance", (item) =>
       provider.startInstance(item),
     ),
