@@ -125,35 +125,27 @@
           "default": "/workspace",
           "markdownDescription": "In-VM path to bind-mount the chosen folder into new machines (read-write). Leave blank to disable."
         },
-        "smolvm.persistent": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Keep machines after the process exits so they can be reconnected. **Required** for Start/Open Shell to work after a reload — disabling it will break those."
-        },
         "smolvm.ports": {
           "type": "array",
           "default": [],
           "markdownDescription": "Host→guest port mappings for new machines.",
           "items": {
             "type": "object",
-            "required": ["host", "guest"],
+            "required": [
+              "host",
+              "guest"
+            ],
             "properties": {
-              "host": { "type": "number", "description": "Host port." },
-              "guest": { "type": "number", "description": "Guest port." }
+              "host": {
+                "type": "number",
+                "description": "Host port."
+              },
+              "guest": {
+                "type": "number",
+                "description": "Guest port."
+              }
             }
           }
-        },
-        "smolvm.autoStopSeconds": {
-          "type": ["number", "null"],
-          "default": null,
-          "minimum": 1,
-          "markdownDescription": "Auto-stop a machine after N idle seconds (cloud). Leave unset to disable."
-        },
-        "smolvm.ttlSeconds": {
-          "type": ["number", "null"],
-          "default": null,
-          "minimum": 1,
-          "markdownDescription": "Delete a machine after N seconds (cloud). Leave unset to disable."
         },
         "smolvm.resources.cpus": {
           "type": "number",
@@ -173,13 +165,19 @@
           "markdownDescription": "Enable outbound network access (TSI) for new machines."
         },
         "smolvm.resources.storageGb": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "default": null,
           "minimum": 1,
           "markdownDescription": "Storage disk size (GB) for new machines. Leave unset for the SDK default (20)."
         },
         "smolvm.resources.overlayGb": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "default": null,
           "minimum": 1,
           "markdownDescription": "Overlay disk size (GB) for new machines. Leave unset for the SDK default (10)."
@@ -240,12 +238,9 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^20.19.43",
     "@types/vscode": "^1.90.0",
     "esbuild": "^0.21.0",
     "typescript": "^5.4.0"
-  },
-  "dependencies": {
-    "smolmachines": "^0.1.5"
   }
 }

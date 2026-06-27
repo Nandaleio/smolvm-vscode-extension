@@ -38,15 +38,11 @@ SDK first if it isn't already running.
 
 ## Requirements
 
-`smolmachines` links a native engine. Per its docs, the local (embedded)
-transport needs **macOS Apple Silicon** or **Linux x64/arm64 with glibc ≥ 2.34
-and KVM**. On unsupported hosts the SDK calls will fail at runtime.
-
-## Getting started
-
-> `smolmachines` is kept **external** from the bundle (it loads a platform
-> specific `.node` addon at runtime) and is shipped in the packaged extension
-> via a `.vscodeignore` negation.
+The **`smolvm` CLI must be installed** and on your `PATH` (or pointed at via the
+`smolvm.cliPath` setting). The extension shells out to it for every action —
+listing, creating, starting, stopping, deleting, and exec/shell — so nothing
+works without it. See [smolmachines.com](https://smolmachines.com/) for install
+instructions.
 
 ## Configuration
 

@@ -1,10 +1,16 @@
 import * as vscode from "vscode";
-import type { MachineConfig, MachineState, MountSpec, ResourceSpec } from "smolmachines";
-import type { InstanceInfo, MachineManager } from "./machineManager";
+import type { MachineManager } from "./machineManager";
+import type {
+  InstanceInfo,
+  MachineConfig,
+  MachineState,
+  MountSpec,
+  ResourceSpec,
+} from "./types";
 
 /**
  * Backs the SmolVM "Instances" tree view. All machine operations are delegated
- * to {@link MachineManager}, which talks to the `smolmachines` SDK.
+ * to {@link MachineManager}, which shells out to the `smolvm` CLI.
  */
 export class InstanceProvider implements vscode.TreeDataProvider<InstanceItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<
