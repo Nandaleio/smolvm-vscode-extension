@@ -1,42 +1,25 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { run, stream } from "./cli";
 import type {
-  Machine,
+  ExecEvent,
+  InstanceInfo,
   MachineConfig,
+  MachineState,
   MountSpec,
   PortSpec,
   ResourceSpec,
-  MachineState,
-  ExecEvent,
-  ExecOptions,
-} from "smolmachines";
-
-const execFileAsync = promisify(execFile);
-
-/** The `Machine` class itself (injected so the SDK is the single source of truth). */
-export type MachineClass = typeof Machine;
-
-/** The vm instance class used for listing VMs  */
-export interface InstanceInfo {
-  name: string;
-  status: MachineState;
-}
+} from "./types";
 
 /**
  * Owns the set of SmolVM machines for the workspace.
  *
- * The list is sourced from the `smolvm` CLI (`machine ls --json`), refreshed at
- * startup and periodically; the latest snapshot is cached in memory and exposed
- * via {@link list}. Lifecycle actions go through the embedded SDK; live
- * {@link Machine} handles are cached so we can stop/delete without reconnecting.
+ * Everything goes through the `smolvm` CLI: the list is sourced from
+ * `machine ls --json` (refreshed at startup and periodically) and cached in
+ * memory; lifecycle actions shell out to the matching `machine` subcommand.
  */
 export class MachineManager {
-  private readonly live = new Map<string, Machine>();
   private snapshot: InstanceInfo[] = [];
-
-  constructor(private readonly Machine: MachineClass) {}
 
   /** The latest cached snapshot from the CLI. */
   list(): InstanceInfo[] {
@@ -49,31 +32,23 @@ export class MachineManager {
 
   /** Re-query `smolvm machine ls --json` and update the cached snapshot. */
   async refresh(): Promise<InstanceInfo[]> {
-    const cli = vscode.workspace
-      .getConfiguration("smolvm")
-      .get<string>("cliPath", "smolvm");
-    const { stdout } = await execFileAsync(
-      cli,
-      ["machine", "ls", "--json"],
-      { timeout: 15_000 },
-    );
+    const stdout = await run(["machine", "ls", "--json"], 15_000);
     this.snapshot = parseMachines(stdout);
     return this.snapshot;
   }
 
-  /** Create and start a new persistent machine. */
+  /** Create a new persistent machine (left stopped; started on first use). */
   async create(name: string, overrides: MachineConfig = {}): Promise<void> {
     if (this.has(name)) {
       throw new Error(`A machine named "${name}" already exists.`);
     }
-    const machine = await this.Machine.create(this.buildConfig(name, overrides));
-    this.live.set(name, machine);
+    await run(createArgs(this.buildConfig(name, overrides)), 300_000);
     await this.refresh();
   }
 
   /**
-   * Create a machine from a Smolfile via the `smolvm` CLI (the SDK has no
-   * Smolfile support): `machine create --name <name> --smolfile <smolfile>`.
+   * Create a machine from a Smolfile:
+   * `machine create --name <name> --smolfile <smolfile>`.
    * The CLI is run from the Smolfile's own directory, passing just its filename,
    * so any relative paths the Smolfile references resolve against that folder.
    */
@@ -81,23 +56,17 @@ export class MachineManager {
     if (this.has(name)) {
       throw new Error(`A machine named "${name}" already exists.`);
     }
-    const cli = vscode.workspace
-      .getConfiguration("smolvm")
-      .get<string>("cliPath", "smolvm");
-
-    await execFileAsync(
-      cli,
+    await run(
       ["machine", "create", "--name", name, "--smolfile", path.basename(smolfilePath)],
-      { timeout: 300_000, cwd: path.dirname(smolfilePath) },
+      300_000,
+      path.dirname(smolfilePath),
     );
     await this.refresh();
   }
 
   /**
-   * Build the SDK {@link MachineConfig}, layering `overrides` (itself a
-   * `Partial<MachineConfig>`) over the configured `smolvm.*` defaults. Every
-   * `MachineConfig` attribute is exposed via settings; optional ones are only
-   * included when set.
+   * Build the {@link MachineConfig}, layering `overrides` over the configured
+   * `smolvm.*` defaults. Optional fields are only included when set.
    */
   private buildConfig(name: string, overrides: MachineConfig): MachineConfig {
     const cfg = vscode.workspace.getConfiguration("smolvm");
@@ -107,7 +76,6 @@ export class MachineManager {
       cpus: res.cpus ?? cfg.get<number>("resources.cpus", 2),
       memoryMb: res.memoryMb ?? cfg.get<number>("resources.memoryMb", 1024),
       network: res.network ?? cfg.get<boolean>("resources.network", true),
-
     };
     const storageGb =
       res.storageGb ?? cfg.get<number | null>("resources.storageGb", null);
@@ -120,11 +88,7 @@ export class MachineManager {
       resources.overlayGb = overlayGb;
     }
 
-    const config: MachineConfig = {
-      name,
-      persistent: overrides.persistent ?? cfg.get<boolean>("persistent", true),
-      resources,
-    };
+    const config: MachineConfig = { name, resources };
 
     const image = (overrides.image ?? cfg.get<string>("image", "")).trim();
     if (image) {
@@ -134,17 +98,6 @@ export class MachineManager {
     const ports = overrides.ports ?? cfg.get<PortSpec[]>("ports", []);
     if (Array.isArray(ports) && ports.length > 0) {
       config.ports = ports;
-    }
-
-    const autoStopSeconds =
-      overrides.autoStopSeconds ?? cfg.get<number | null>("autoStopSeconds", null);
-    if (autoStopSeconds != null) {
-      config.autoStopSeconds = autoStopSeconds;
-    }
-    const ttlSeconds =
-      overrides.ttlSeconds ?? cfg.get<number | null>("ttlSeconds", null);
-    if (ttlSeconds != null) {
-      config.ttlSeconds = ttlSeconds;
     }
 
     const mounts = overrides.mounts ?? this.defaultMounts(cfg);
@@ -166,54 +119,61 @@ export class MachineManager {
     return [{ source, target, readonly: false }];
   }
 
-  /** Start (boot) a stopped machine by reconnecting to it. */
+  /** Start (boot) a stopped machine. */
   async start(name: string): Promise<void> {
-    // The SDK has no instance `start()`; `connect` re-opens by name and boots it.
-    this.live.delete(name);
-    const machine = await this.Machine.connect(name);
-    this.live.set(name, machine);
+    await run(["machine", "start", "--name", name], 300_000);
     await this.refresh();
   }
 
-  /**
-   * Execute a command in a machine and stream stdout/stderr/exit events as they
-   * arrive. The machine is reconnected by name if no live handle is cached.
-   */
-  execStream(
-    name: string,
-    command: string[],
-    opts?: ExecOptions,
-  ): AsyncGenerator<ExecEvent> {
-    const handlePromise = this.handle(name);
-    async function* stream(): AsyncGenerator<ExecEvent> {
-      const machine = await handlePromise;
-      yield* machine.execStream(command, opts);
-    }
-    return stream();
-  }
-
   async stop(name: string): Promise<void> {
-    const machine = await this.handle(name);
-    await machine.stop();
+    await run(["machine", "stop", "--name", name]);
     await this.refresh();
   }
 
   async delete(name: string): Promise<void> {
-    const machine = await this.handle(name);
-    await machine.delete();
-    this.live.delete(name);
+    await run(["machine", "delete", "--name", name, "--force"]);
     await this.refresh();
   }
 
-  /** A live handle, reconnecting by name if we don't have one cached. */
-  private async handle(name: string): Promise<Machine> {
-    let machine = this.live.get(name);
-    if (!machine) {
-      machine = await this.Machine.connect(name);
-      this.live.set(name, machine);
-    }
-    return machine;
+  /**
+   * Execute a command in a machine via `machine exec --stream`, yielding
+   * stdout/stderr chunks as they arrive and a terminal exit/error event.
+   * Calling `.return()` on the generator kills the child (cancellation).
+   */
+  execStream(name: string, command: string[]): AsyncGenerator<ExecEvent> {
+    return stream(["machine", "exec", "--name", name, "--stream", "--", ...command]);
   }
+}
+
+/** Translate a {@link MachineConfig} into `machine create` CLI arguments. */
+function createArgs(config: MachineConfig): string[] {
+  const args = ["machine", "create", "--name", config.name!];
+  if (config.image) {
+    args.push("--image", config.image);
+  }
+  const r = config.resources ?? {};
+  if (r.cpus != null) {
+    args.push("--cpus", String(r.cpus));
+  }
+  if (r.memoryMb != null) {
+    args.push("--mem", String(r.memoryMb));
+  }
+  if (r.storageGb != null) {
+    args.push("--storage", String(r.storageGb));
+  }
+  if (r.overlayGb != null) {
+    args.push("--overlay", String(r.overlayGb));
+  }
+  if (r.network) {
+    args.push("--net");
+  }
+  for (const p of config.ports ?? []) {
+    args.push("--port", `${p.host}:${p.guest}`);
+  }
+  for (const m of config.mounts ?? []) {
+    args.push("--volume", `${m.source}:${m.target}${m.readonly ? ":ro" : ""}`);
+  }
+  return args;
 }
 
 /** Parse the JSON array printed by `smolvm machine ls --json`. */

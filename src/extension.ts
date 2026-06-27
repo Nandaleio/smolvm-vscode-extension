@@ -1,10 +1,9 @@
 import * as vscode from "vscode";
-import { Machine } from "smolmachines";
 import { InstanceProvider } from "./instanceProvider";
 import { MachineManager } from "./machineManager";
 
 export function activate(context: vscode.ExtensionContext): void {
-  const manager = new MachineManager(Machine);
+  const manager = new MachineManager();
   const provider = new InstanceProvider(context, manager);
 
   const treeView = vscode.window.createTreeView("smolvm.instances", {
